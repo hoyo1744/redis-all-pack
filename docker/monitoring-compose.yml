@@ -1,0 +1,48 @@
+name: redis-all-pack-monitoring
+
+# exporter 를 여기 둔다. 클러스터 compose 는 Redis 만 갖게 해서 가볍게 유지한다.
+# exporter 는 호스트 포트로 노드에 붙으므로 클러스터가 떠 있기만 하면 된다.
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: redis-all-pack-prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - ./grafana/prometheus.yml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana
+    container_name: redis-all-pack-grafana
+    ports: ["3000:3000"]
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  # 노드별로 하나씩. 2주차 핫키·쏠림은 노드 단위 지표가 있어야 보인다.
+  redis-exporter-1:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-1
+    ports: ["9121:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7001"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  redis-exporter-2:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-2
+    ports: ["9122:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7002"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  redis-exporter-3:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-3
+    ports: ["9123:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7003"
+    extra_hosts: ["host.docker.internal:host-gateway"]

@@ -1,0 +1,147 @@
+# cluster-announce-ip 는 호스트의 LAN IP 여야 한다. 127.0.0.1 을 쓰면 각 노드가 자기를
+# "127.0.0.1" 로 알리는데, 그 주소는 다른 노드 컨테이너 안에서 전혀 다른 루프백을 가리켜
+# 노드 간 gossip(CLUSTER MEET)이 통째로 깨진다.
+# Wi-Fi 가 바뀌거나 DHCP 가 갱신되면 아래 값을 고치고 클러스터를 다시 만들어야 한다.
+x-host-lan-ip: &host-lan-ip "192.168.0.24"
+
+name: redis-all-pack-cluster
+
+# 기본은 마스터 3개다. Redis Cluster 는 그보다 적게 만들 수 없다 —
+# failover 투표에 마스터 과반이 필요해서 create 자체가 거부된다.
+#
+# 레플리카는 profile 뒤에 숨겼다. 3주차(락 소실 재현) 에서만 필요하다.
+# cluster-init 이 노드가 healthy 해질 때까지 기다렸다가 클러스터를 만든다.
+# 별도 스크립트를 돌릴 필요 없이 up 한 번이면 끝난다.
+#   기본        docker compose -f docker/redis-cluster-compose.yml up -d
+#   3주차       docker compose -f docker/redis-cluster-compose.yml --profile replica up -d
+services:
+  redis-node-1:
+    image: redis:7.0
+    container_name: redis-all-pack-1
+    ports: ["7001:7001", "17001:17001"]
+    command:
+      ["redis-server", "--port", "7001", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7001", "--cluster-announce-bus-port", "17001"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7001", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redis-node-2:
+    image: redis:7.0
+    container_name: redis-all-pack-2
+    ports: ["7002:7002", "17002:17002"]
+    command:
+      ["redis-server", "--port", "7002", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7002", "--cluster-announce-bus-port", "17002"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7002", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redis-node-3:
+    image: redis:7.0
+    container_name: redis-all-pack-3
+    ports: ["7003:7003", "17003:17003"]
+    command:
+      ["redis-server", "--port", "7003", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7003", "--cluster-announce-bus-port", "17003"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7003", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redis-node-4:
+    image: redis:7.0
+    container_name: redis-all-pack-4
+    profiles: ["replica"]
+    ports: ["7004:7004", "17004:17004"]
+    command:
+      ["redis-server", "--port", "7004", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7004", "--cluster-announce-bus-port", "17004"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7004", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redis-node-5:
+    image: redis:7.0
+    container_name: redis-all-pack-5
+    profiles: ["replica"]
+    ports: ["7005:7005", "17005:17005"]
+    command:
+      ["redis-server", "--port", "7005", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7005", "--cluster-announce-bus-port", "17005"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7005", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redis-node-6:
+    image: redis:7.0
+    container_name: redis-all-pack-6
+    profiles: ["replica"]
+    ports: ["7006:7006", "17006:17006"]
+    command:
+      ["redis-server", "--port", "7006", "--cluster-enabled", "yes",
+       "--cluster-config-file", "nodes.conf", "--cluster-node-timeout", "5000",
+       "--appendonly", "no", "--cluster-announce-ip", *host-lan-ip,
+       "--cluster-announce-port", "7006", "--cluster-announce-bus-port", "17006"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7006", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  # 노드가 다 뜨면 클러스터를 만들고 빠진다.
+  # 이미 구성돼 있으면 아무것도 하지 않으므로 up 을 여러 번 해도 안전하다.
+  cluster-init:
+    image: redis:7.0
+    container_name: redis-all-pack-init
+    restart: "no"
+    depends_on:
+      redis-node-1: { condition: service_healthy }
+      redis-node-2: { condition: service_healthy }
+      redis-node-3: { condition: service_healthy }
+    environment:
+      HOST_LAN_IP: *host-lan-ip
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        if redis-cli -h "$$HOST_LAN_IP" -p 7001 cluster info 2>/dev/null | grep -q 'cluster_state:ok'; then
+          echo "클러스터가 이미 구성돼 있습니다."
+          exit 0
+        fi
+
+        # 레플리카 노드가 떠 있으면 6대 · replicas 1 로, 아니면 3대 · replicas 0 으로 만든다.
+        NODES="$$HOST_LAN_IP:7001 $$HOST_LAN_IP:7002 $$HOST_LAN_IP:7003"
+        REPLICAS=0
+        if redis-cli -h "$$HOST_LAN_IP" -p 7004 ping 2>/dev/null | grep -q PONG; then
+          echo "레플리카 노드를 감지했습니다."
+          for p in 7005 7006; do
+            until redis-cli -h "$$HOST_LAN_IP" -p $$p ping 2>/dev/null | grep -q PONG; do sleep 1; done
+          done
+          NODES="$$NODES $$HOST_LAN_IP:7004 $$HOST_LAN_IP:7005 $$HOST_LAN_IP:7006"
+          REPLICAS=1
+        fi
+
+        echo "클러스터 생성 (replicas=$$REPLICAS)"
+        redis-cli --cluster create $$NODES --cluster-replicas $$REPLICAS --cluster-yes
+        redis-cli -h "$$HOST_LAN_IP" -p 7001 cluster info | grep cluster_state

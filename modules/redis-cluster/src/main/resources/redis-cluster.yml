@@ -1,0 +1,14 @@
+spring:
+  data:
+    redis:
+      cluster:
+        # 레플리카를 켜도 시드는 마스터 3개면 충분하다. 나머지는 토폴로지에서 발견한다.
+        nodes: ${REDIS_CLUSTER_NODES:localhost:7001,localhost:7002,localhost:7003}
+        # MOVED 를 따라가는 횟수. 리샤딩 중에는 이 값이 모자라면 요청이 실패한다.
+        max-redirects: 3
+      timeout: 2s
+      lettuce:
+        pool:
+          max-active: 64
+          max-idle: 32
+          min-idle: 8

@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/redis_all_pack?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul}
+    username: ${DB_USERNAME:application}
+    password: ${DB_PASSWORD:application}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 스탬피드 실험에서 커넥션이 마르는 걸 보려면 풀이 작아야 한다.
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true

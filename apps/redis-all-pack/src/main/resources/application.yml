@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: redis-all-pack
+
+  config:
+    import:
+      - redis-cluster.yml
+      - jpa.yml
+      - kafka.yml
+      - monitoring.yml
+
+logging:
+  file:
+    name: logs/redis-all-pack.log
+  level:
+    root: INFO
+    com.study.redisallpack: DEBUG
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

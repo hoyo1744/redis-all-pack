@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'redis-all-pack-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  # 노드별로 따로 긁는다. 핫키·슬롯 분산(2주차)을 보려면 노드 단위 지표가 필요하다.
+  - job_name: 'redis-cluster'
+    static_configs:
+      - targets:
+          - 'host.docker.internal:9121'
+          - 'host.docker.internal:9122'
+          - 'host.docker.internal:9123'
