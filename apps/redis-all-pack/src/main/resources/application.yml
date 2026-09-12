@@ -1,3 +1,19 @@
+coupon:
+  lock:
+    # 짧게 주면 임계 구역이 TTL 을 넘겨 **락이 뚫리는 상황**을 만들 수 있다. 3주차 재현용.
+    lease-millis: ${COUPON_LOCK_LEASE_MILLIS:3000}
+    wait-millis: ${COUPON_LOCK_WAIT_MILLIS:500}
+  fence:
+    # 펜싱 토큰을 어디서 받나. **구현체만 갈아끼운다 — 도메인 코드는 그대로다.**
+    #   redis      RedisFenceGenerator     — INCR. 원자적이라 재시도가 없지만 failover 시 되감긴다
+    #   rdb        RdbFenceGenerator       — 낙관적 락. 재시도가 붙지만 되감기지 않는다
+    #   zookeeper  ZookeeperFenceGenerator — 순차 znode. 경합이 없고 되감기지 않지만 과반 fsync 를 문다
+    source: ${COUPON_FENCE_SOURCE:redis}
+    zookeeper:
+      # 3 노드 앙상블. docker/zookeeper-compose.yml
+      connect-string: ${ZK_CONNECT:localhost:2181,localhost:2182,localhost:2183}
+      base-path: /fence
+
 server:
   port: 8080
 

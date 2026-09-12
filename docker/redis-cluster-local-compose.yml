@@ -1,0 +1,120 @@
+# LAN 라우팅이 없는 환경용 클러스터 (Docker Desktop VM 이 호스트 LAN 으로 못 나갈 때).
+#
+# 원래 구성(redis-cluster-compose.yml)은 cluster-announce-ip 에 호스트 LAN IP 를 쓴다.
+# 그 주소가 컨테이너에서 안 닿으면 gossip 이 통째로 깨진다. 그렇다고 127.0.0.1 을 쓰면
+# 노드마다 자기 루프백을 가리켜 서로를 못 찾는다 — **노드가 서로 다른 컨테이너일 때** 얘기다.
+#
+# 그래서 노드들을 한 컨테이너에 프로세스로 띄운다. 네트워크 네임스페이스를 공유하므로
+# 127.0.0.1:700x 가 컨테이너 안에서도 호스트에서도 같은 노드를 가리킨다.
+#   컨테이너 안  127.0.0.1:7002 → 2번 프로세스 (같은 netns)
+#   호스트       127.0.0.1:7002 → 퍼블리시된 2번 포트
+#
+# 슬롯은 여전히 셋으로 갈리므로 핫키·분산 실험 결과는 원래 구성과 같다.
+# 격리가 필요한 실험(노드 장애, RedLock)에는 쓰지 말 것.
+#
+#   마스터 3대                docker compose -f docker/redis-cluster-local-compose.yml up -d
+#   + 레플리카 3대 (3주차)     REDIS_REPLICAS=1 docker compose -f docker/redis-cluster-local-compose.yml up -d
+#
+# ⚠️ REDIS_REPLICAS 값을 바꾸면 컨테이너가 재생성되어 **데이터가 사라진다** (볼륨 없음).
+#    클러스터는 다시 만들어지므로 실험 키만 다시 심으면 된다.
+
+name: redis-all-pack-cluster-local
+
+services:
+  redis-cluster:
+    image: redis:7.0
+    container_name: redis-all-pack-cluster-local
+    environment:
+      # 1 이면 7004~7006 을 띄워 마스터 7001~7003 에 하나씩 붙인다 (7004→7001, 7005→7002, 7006→7003)
+      REPLICAS: "${REDIS_REPLICAS:-0}"
+    ports:
+      - "7001:7001"
+      - "7002:7002"
+      - "7003:7003"
+      - "7004:7004"
+      - "7005:7005"
+      - "7006:7006"
+      - "17001:17001"
+      - "17002:17002"
+      - "17003:17003"
+      - "17004:17004"
+      - "17005:17005"
+      - "17006:17006"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        PORTS="7001 7002 7003"
+        REPL_PORTS=""
+        if [ "$$REPLICAS" = "1" ]; then REPL_PORTS="7004 7005 7006"; fi
+
+        for p in $$PORTS $$REPL_PORTS; do
+          mkdir -p /data/$$p
+          redis-server \
+            --port $$p \
+            --dir /data/$$p \
+            --cluster-enabled yes \
+            --cluster-config-file nodes.conf \
+            --cluster-node-timeout 5000 \
+            --appendonly no \
+            --cluster-announce-ip 127.0.0.1 \
+            --cluster-announce-port $$p \
+            --cluster-announce-bus-port 1$$p \
+            --daemonize yes
+        done
+
+        # 프로세스가 다 응답할 때까지 기다린다.
+        for p in $$PORTS $$REPL_PORTS; do
+          until redis-cli -p $$p ping 2>/dev/null | grep -q PONG; do sleep 1; done
+        done
+
+        # ⚠️ 재시작이면 노드가 nodes.conf 로 기존 구성을 복구하는 데 시간이 걸린다.
+        # 바로 판단하면 아직 ok 가 아니라서 create 로 빠지고, 이미 데이터가 있어 실패한다.
+        # 최대 30 초 기다려본 뒤에 결정한다.
+        i=0
+        while [ $$i -lt 30 ]; do
+          redis-cli -p 7001 cluster info | grep -q 'cluster_state:ok' && break
+          i=$$((i+1)); sleep 1
+        done
+
+        if redis-cli -p 7001 cluster info | grep -q 'cluster_state:ok'; then
+          echo "클러스터가 이미 구성돼 있습니다."
+        elif [ "$$(redis-cli -p 7001 cluster info | grep -c 'cluster_known_nodes:1')" = "1" ]; then
+          echo "클러스터를 만듭니다."
+          redis-cli --cluster create \
+            127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 \
+            --cluster-yes
+        else
+          echo "기존 구성이 있으나 아직 ok 가 아닙니다. 그대로 둡니다."
+          redis-cli -p 7001 cluster nodes
+        fi
+
+        # 레플리카를 마스터에 붙인다. 이미 붙어 있으면(재시작) 건너뛴다.
+        # add-node 가 MEET → 빈 노드 검사 → CLUSTER REPLICATE 까지 대신 해준다.
+        if [ -n "$$REPL_PORTS" ]; then
+          for rp in $$REPL_PORTS; do
+            mp=$$((rp - 3))
+            if redis-cli -p $$rp info replication | grep -q 'role:slave'; then
+              echo "$$rp 는 이미 레플리카입니다."
+            else
+              mid=$$(redis-cli -p $$mp cluster myid | tr -d '\r')
+              echo "$$rp 를 $$mp 의 레플리카로 붙입니다. (master-id=$$mid)"
+              redis-cli --cluster add-node 127.0.0.1:$$rp 127.0.0.1:7001 \
+                --cluster-slave --cluster-master-id $$mid
+              sleep 1
+            fi
+          done
+        fi
+
+        redis-cli -p 7001 cluster info | grep -E 'cluster_state|cluster_known_nodes'
+
+        # 프로세스가 살아 있는 동안 컨테이너를 유지한다.
+        while redis-cli -p 7001 ping >/dev/null 2>&1; do sleep 5; done
+        echo "노드가 죽었습니다."
+        exit 1
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -p 7001 cluster info | grep -q cluster_state:ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

@@ -1,0 +1,51 @@
+# 펜싱 토큰 발급처 대조군. **3 노드 앙상블이어야 한다.**
+#
+# 단일 노드로 띄우면 ZooKeeper 의 특징인 **과반 fsync 비용**이 사라져서
+# "안전한 대신 얼마나 비싼가" 를 재는 의미가 없어진다. 그게 이 비교의 핵심이다.
+#
+#   docker compose -f docker/zookeeper-compose.yml up -d
+#
+# 앱은 이렇게 띄운다:
+#   COUPON_FENCE_SOURCE=zookeeper ./gradlew :apps:redis-all-pack:bootRun
+name: redis-all-pack-zookeeper
+
+x-zk-common: &zk-common
+  image: zookeeper:3.9
+  restart: unless-stopped
+  environment: &zk-env
+    ZOO_SERVERS: server.1=zk1:2888:3888;2181 server.2=zk2:2888:3888;2181 server.3=zk3:2888:3888;2181
+    # 4lw 명령을 열어야 헬스체크(ruok)가 통한다.
+    ZOO_4LW_COMMANDS_WHITELIST: "srvr,ruok,stat,mntr"
+    # ⚠️ forceSync 를 끄면 커밋이 디스크에 안 남아 **되감김 방지 보장이 깨진다.**
+    #    성능 튜닝한다고 끄는 경우가 있는데, 펜싱 토큰 출처로 쓸 거면 켜둬야 한다.
+    ZOO_CFG_EXTRA: "forceSync=yes"
+  healthcheck:
+    test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+
+services:
+  zk1:
+    <<: *zk-common
+    container_name: redis-all-pack-zk1
+    ports: ["2181:2181"]
+    environment:
+      <<: *zk-env
+      ZOO_MY_ID: "1"
+
+  zk2:
+    <<: *zk-common
+    container_name: redis-all-pack-zk2
+    ports: ["2182:2181"]
+    environment:
+      <<: *zk-env
+      ZOO_MY_ID: "2"
+
+  zk3:
+    <<: *zk-common
+    container_name: redis-all-pack-zk3
+    ports: ["2183:2181"]
+    environment:
+      <<: *zk-env
+      ZOO_MY_ID: "3"

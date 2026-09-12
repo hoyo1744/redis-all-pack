@@ -46,3 +46,33 @@ services:
     environment:
       REDIS_ADDR: "redis://host.docker.internal:7003"
     extra_hosts: ["host.docker.internal:host-gateway"]
+
+  # ── 레플리카용 (3주차 레플리카 읽기) ──────────────────────────────
+  # 레플리카 없이 클러스터만 띄웠으면 이 셋은 down 타깃으로 남는다. 무해하다.
+  #   docker compose -f docker/monitoring-compose.yml --profile replica up -d
+  redis-exporter-4:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-4
+    profiles: ["replica"]
+    ports: ["9124:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7004"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  redis-exporter-5:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-5
+    profiles: ["replica"]
+    ports: ["9125:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7005"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  redis-exporter-6:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-all-pack-exporter-6
+    profiles: ["replica"]
+    ports: ["9126:9121"]
+    environment:
+      REDIS_ADDR: "redis://host.docker.internal:7006"
+    extra_hosts: ["host.docker.internal:host-gateway"]

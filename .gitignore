@@ -6,3 +6,6 @@ logs/
 .idea/
 .DS_Store
 *.log
+
+# 블로그 원고·다이어그램 (로컬 전용)
+docs/

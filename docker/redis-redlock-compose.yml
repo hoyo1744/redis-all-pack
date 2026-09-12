@@ -1,0 +1,49 @@
+# RedLock 전용 노드 3대.
+#
+# **클러스터를 두고 왜 또 띄우나?**
+# RedLock 은 "서로 아무 관계 없는 마스터 N 대" 를 전제한다. 각 노드가 같은 키를 독립적으로
+# 들고 있어야 과반이라는 말이 성립하기 때문이다.
+#
+# Redis Cluster 에서는 그게 안 된다. 키 하나는 CRC16 으로 슬롯 하나에 고정되고,
+# 그 슬롯을 소유하지 않은 노드에 SET 을 보내면 MOVED 가 돌아온다.
+# 클러스터 마스터 3 대에 같은 락 키를 심는 것 자체가 불가능하다.
+#
+# 그래서 cluster-enabled 를 끈 독립 인스턴스를 따로 둔다.
+# 복제도 걸지 않는다 — RedLock 은 복제 대신 과반으로 내구성을 얻겠다는 설계다.
+#
+#   docker compose -f docker/redis-redlock-compose.yml up -d
+name: redis-all-pack-redlock
+
+services:
+  redlock-node-1:
+    image: redis:7.0
+    container_name: redis-all-pack-redlock-1
+    ports: ["7101:7101"]
+    command: ["redis-server", "--port", "7101", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7101", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redlock-node-2:
+    image: redis:7.0
+    container_name: redis-all-pack-redlock-2
+    ports: ["7102:7102"]
+    command: ["redis-server", "--port", "7102", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7102", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  redlock-node-3:
+    image: redis:7.0
+    container_name: redis-all-pack-redlock-3
+    ports: ["7103:7103"]
+    command: ["redis-server", "--port", "7103", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7103", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 10

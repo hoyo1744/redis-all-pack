@@ -13,4 +13,13 @@ class CouponRepositoryImpl(
 
     override fun findByCouponId(couponId: String): Coupon? =
         couponJpaRepository.findByCouponId(couponId)
+
+    override fun findLatestByCouponId(couponId: String): Coupon? =
+        couponJpaRepository.findByCouponIdForUpdate(couponId)
+
+    override fun issueIfAvailable(couponId: String): Int =
+        couponJpaRepository.issueIfAvailable(couponId)
+
+    override fun issueIfAvailable(couponId: String, fence: Long): Int =
+        couponJpaRepository.issueIfAvailable(couponId, fence)
 }

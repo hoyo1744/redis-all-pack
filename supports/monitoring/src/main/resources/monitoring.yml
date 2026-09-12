@@ -9,3 +9,21 @@ management:
   metrics:
     tags:
       application: redis-all-pack
+    distribution:
+      # ⚠️ 히스토그램을 켜야 대시보드에서 p95 를 그릴 수 있다.
+      #    안 켜면 count/sum 만 나가 평균밖에 못 본다 — 락 비교는 평균으로는 안 보인다.
+      #    스핀락이 대기 예산을 다 쓰고 튕기는 게 **p95 에서만** 드러나기 때문이다.
+      percentiles-histogram:
+        coupon.issue: true
+        coupon.fence.issue: true
+        # 핫키 대시보드의 조회 p95 가 이걸 쓴다. 없으면 histogram_quantile 이 빈 그래프가 된다.
+        http.server.requests: true
+      # 로컬 실험이라 범위를 좁게 잡는다. 넓게 두면 버킷이 늘어 스크레이프가 무거워진다.
+      minimum-expected-value:
+        coupon.issue: 1ms
+        coupon.fence.issue: 100us
+        http.server.requests: 1ms
+      maximum-expected-value:
+        coupon.issue: 5s
+        coupon.fence.issue: 2s
+        http.server.requests: 2s

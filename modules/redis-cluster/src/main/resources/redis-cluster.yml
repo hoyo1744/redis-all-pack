@@ -12,3 +12,14 @@ spring:
           max-active: 64
           max-idle: 32
           min-idle: 8
+
+# RedLock 전용 노드. **위 클러스터와 다른 인스턴스다.**
+# 클러스터에서는 키 하나가 슬롯 하나에 고정돼 세 노드에 같은 락 키를 심을 수 없다.
+#   docker compose -f docker/redis-redlock-compose.yml up -d
+redis:
+  redlock:
+    # false 로 두면 RedLock 빈이 안 뜬다. 노드를 안 띄운 채로 다른 락만 재고 싶을 때.
+    enabled: ${REDLOCK_ENABLED:true}
+    nodes: ${REDLOCK_NODES:localhost:7101,localhost:7102,localhost:7103}
+    # 죽은 노드에서 오래 붙들리면 유효 시간(lease - 경과 - 시계오차)이 음수가 된다. 짧게 끊는다.
+    timeout-millis: 300

@@ -9,6 +9,12 @@ dependencies {
     implementation(project(":supports:monitoring"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
+
+    // 펜싱 토큰 대조군. ZooKeeper 순차 znode 로 단조 증가 번호를 받는다.
+    implementation("org.apache.curator:curator-framework:${project.properties["curatorVersion"]}")
+
+    // 핫키 로컬 캐시 대조군. 손제작 캐시와 달리 동시 미스를 한 번의 로드로 합쳐준다.
+    implementation("com.github.ben-manes.caffeine:caffeine")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${project.properties["springDocOpenApiVersion"]}")
 
     testImplementation(testFixtures(project(":modules:redis-cluster")))

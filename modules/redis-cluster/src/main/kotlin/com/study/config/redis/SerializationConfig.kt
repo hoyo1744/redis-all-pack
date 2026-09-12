@@ -1,8 +1,5 @@
 package com.study.config.redis
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.smile.SmileFactory
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
@@ -14,8 +11,15 @@ import org.springframework.data.redis.serializer.StringRedisSerializer
 @Configuration
 class SerializationConfig {
 
-    @Bean
-    fun smileObjectMapper(): ObjectMapper = ObjectMapper(SmileFactory()).registerKotlinModule()
+    // ⚠️ Smile ObjectMapper 를 빈으로 등록하면 안 된다.
+    //
+    // `ObjectMapper` 타입 빈이 하나라도 있으면 스프링 부트의 JacksonAutoConfiguration 이
+    // `@ConditionalOnMissingBean` 때문에 물러난다. 그러면 **HTTP 메시지 컨버터가 그 Smile 매퍼를 쓴다.**
+    // 응답이 전부 바이너리로 나가고, JSON 요청 본문은 파싱에 실패해 400 이 된다.
+    // KafkaConfig 의 `jsonMessageConverter(objectMapper)` 도 이걸 받아 이름과 달리 Smile 로 동작한다.
+    //
+    // Smile 이 필요한 곳은 Redis 직렬화뿐이고, [SmileRedisSerializer] 가 자기 매퍼를 직접 만든다.
+    // 4주차 비교에서 매퍼를 공유해야 하면 `ObjectMapper` 가 아닌 전용 타입으로 감싸서 등록할 것.
 
     @Bean
     fun jsonRedisTemplate(factory: LettuceConnectionFactory): RedisTemplate<String, Any> =

@@ -35,5 +35,5 @@ class CouponCacheRepositoryImpl(
     }
 
     /** 해시태그 없이 둔다. 4주차에서 `{...}` 를 씌웠을 때 분포가 어떻게 바뀌는지 비교한다. */
-    private fun key(couponId: String) = "coupon:remaining:$couponId"
+    private fun key(couponId: String) = "event:remaining:$couponId"
 }

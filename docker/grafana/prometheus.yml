@@ -8,9 +8,20 @@ scrape_configs:
       - targets: ['host.docker.internal:8080']
 
   # 노드별로 따로 긁는다. 핫키·슬롯 분산(2주차)을 보려면 노드 단위 지표가 필요하다.
+  # 노드마다 static_configs 를 따로 둬 node 라벨을 붙인다.
+  # 그래야 그라파나 범례에 9121 대신 "7001 master" 로 뜬다.
   - job_name: 'redis-cluster'
     static_configs:
-      - targets:
-          - 'host.docker.internal:9121'
-          - 'host.docker.internal:9122'
-          - 'host.docker.internal:9123'
+      - targets: ['host.docker.internal:9121']
+        labels: { node: '7001 master' }
+      - targets: ['host.docker.internal:9122']
+        labels: { node: '7002 master' }
+      - targets: ['host.docker.internal:9123']
+        labels: { node: '7003 master' }
+      # 레플리카 (9124~9126). exporter 를 --profile replica 로 띄웠을 때만 up 이다.
+      - targets: ['host.docker.internal:9124']
+        labels: { node: '7004 replica of 7001' }
+      - targets: ['host.docker.internal:9125']
+        labels: { node: '7005 replica of 7002' }
+      - targets: ['host.docker.internal:9126']
+        labels: { node: '7006 replica of 7003' }
