@@ -10,6 +10,9 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-web")
 
+    // @TwoLevelTtlCacheable 애노테이션으로 soft TTL 을 범용화한다 (@Aspect / @Around).
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // 펜싱 토큰 대조군. ZooKeeper 순차 znode 로 단조 증가 번호를 받는다.
     implementation("org.apache.curator:curator-framework:${project.properties["curatorVersion"]}")
 

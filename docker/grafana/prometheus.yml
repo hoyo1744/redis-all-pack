@@ -4,6 +4,7 @@ global:
 scrape_configs:
   - job_name: 'redis-all-pack-app'
     metrics_path: '/actuator/prometheus'
+    scrape_interval: 1s   # 스탬피드 봉우리는 1초 미만이라 촘촘히 긁는다
     static_configs:
       - targets: ['host.docker.internal:8080']
 

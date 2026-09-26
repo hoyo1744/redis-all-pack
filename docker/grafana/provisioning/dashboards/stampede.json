@@ -1,0 +1,179 @@
+{
+  "uid": "redis-all-pack-stampede",
+  "title": "캐시 스탬피드 — 원본 재계산",
+  "tags": [
+    "redis-all-pack",
+    "week6",
+    "stampede"
+  ],
+  "timezone": "",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "원본(DB) 재계산 — 스탬피드가 여기서 보인다",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "전략별 원본 재계산 rate",
+      "description": "만료 순간 이 선이 치솟으면 떼몰림이 DB 를 때린 것이다. NONE/JITTER=봉우리, LOCK=만료당 1, SOFT_TTL=계단, PER=평평한 바닥.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum by (strategy) (rate(cache_origin_recompute_total[30s]))",
+          "legendFormat": "{{strategy}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "전략별 재계산 누적 (현재 구간)",
+      "description": "이 구간 동안 DB 를 몇 번 재계산했나. 작을수록 스탬피드를 잘 막은 것.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum by (strategy) (increase(cache_origin_recompute_total[$__range]))",
+          "legendFormat": "{{strategy}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      },
+      "options": {
+        "xField": "strategy",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "type": "row",
+      "title": "조회 지표 (참고)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "조회 처리량 / p95",
+      "description": "재계산을 줄여도 응답 지연·처리량이 유지되는지 본다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=~\".*remaining.*\"}[30s]))",
+          "legendFormat": "rps"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri=~\".*remaining.*\"}[1m])))",
+          "legendFormat": "p95(s)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis 노드별 메모리",
+      "description": "PER/LOCK 이 쓰는 별도 키(per:, lock:) 때문에 메모리가 어떻게 변하나.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "{{node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 15,
+            "lineWidth": 2
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        }
+      }
+    }
+  ]
+}

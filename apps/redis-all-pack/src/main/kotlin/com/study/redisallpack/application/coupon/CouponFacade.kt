@@ -10,6 +10,7 @@ import com.study.config.redis.RedLockNodes
 import com.study.redisallpack.infrastructure.lock.DistributedLocks
 import com.study.redisallpack.infrastructure.metrics.CouponMetrics
 import com.study.redisallpack.infrastructure.metrics.CouponStateMetrics
+import com.study.redisallpack.infrastructure.metrics.StampedeMetrics
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.time.Duration
@@ -27,6 +28,7 @@ class CouponFacade(
     private val fenceGenerator: FenceGenerator,
     private val couponMetrics: CouponMetrics,
     private val couponStateMetrics: CouponStateMetrics,
+    private val stampedeMetrics: StampedeMetrics,
     private val remainingReaders: RemainingReaders,
     /** 클럭 드리프트 실험이 켜져 있는지 [settings] 로 드러낸다. 모르면 측정값을 오해한다. */
     private val redLockNodes: RedLockNodes? = null,
@@ -74,6 +76,9 @@ class CouponFacade(
             return CouponResult.Remaining(couponId, it, fromCache = true)
         }
 
+        // 캐시 미스 → DB 재계산. 만료 순간 이 경로가 몰리는 게 캐시 스탬피드다.
+        // (PER · LOCK 은 read 안에서 스스로 재계산·집계하므로 여기 오지 않는다.)
+        stampedeMetrics.recordRecompute(strategy)
         val remaining = couponService.getRemaining(couponId)
         reader.write(couponId, remaining)
 
