@@ -1,0 +1,337 @@
+{
+  "uid": "redis-all-pack-layout",
+  "title": "키 레이아웃 — 키 N개 vs 키 하나",
+  "tags": [
+    "redis-all-pack",
+    "layout",
+    "memory"
+  ],
+  "timezone": "",
+  "schemaVersion": 39,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "메모리 — 방식별 비교 (마지막 측정값)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "아이템당 메모리 — 아이템 100개 · 값 10B",
+      "description": "아이템 10만 개를 넣었을 때 마스터 used_memory 증가분 ÷ 10만. 키 이름·관리 구조·값을 전부 포함한다. POST /api/v1/layout/memory/compare 를 돌리면 갱신된다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "layout_memory_bytes_per_item{items=\"100\",value_bytes=\"10\"}",
+          "legendFormat": "{{layout}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "listpack 경계 — HASH",
+      "description": "필드 512개·값 64B 를 넘으면 listpack → hashtable 로 바뀌어 계단처럼 뛴다. items=512/513, valueBytes=64/65 로 /memory?layout=HASH 를 돌리면 막대가 생긴다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "layout_memory_bytes_per_item{layout=\"HASH\"}",
+          "legendFormat": "필드 {{items}}개 · 값 {{value_bytes}}B",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "시간축 — 넣는 순간 메모리·키 수가 얼마나 오르나",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "마스터 노드별 used_memory (누적)",
+      "description": "쌓아 올린 높이가 마스터 3대 합이다. POST /api/v1/layout/memory/showcase 를 돌리면 방식마다 넣고 → 20초 유지 → 지우기를 반복해 계단이 생긴다. 계단 높이가 그 방식이 쓴 메모리다. (레플리카는 제외)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes * on(instance) group_left(tcp_port) redis_instance_info{role=\"master\"}",
+          "legendFormat": "{{tcp_port}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "마스터 노드별 키 수 (누적)",
+      "description": "STRING_KEYS 는 10만 개, 나머지는 1,000 개만 오른다. 메모리 계단과 나란히 보면 '키 개수 = 키 유지 비용' 이 보인다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "targets": [
+        {
+          "expr": "redis_db_keys * on(instance) group_left(tcp_port) redis_instance_info{role=\"master\"}",
+          "legendFormat": "{{tcp_port}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 40,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "연산 · 동시성 (마지막 측정값)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "연산 평균 지연",
+      "description": "그룹 하나(아이템 100개)에 각 연산 2,000번 평균. 로컬이라 절대값보다 비율을 볼 것. STRING_KEYS 의 read_all 은 MGET 이 노드별로 쪼개져 길다. POST /api/v1/layout/ops/compare",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 14,
+        "x": 0,
+        "y": 21
+      },
+      "targets": [
+        {
+          "expr": "layout_ops_micros",
+          "legendFormat": "{{layout}} · {{op}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "동시 갱신 유실 비율",
+      "description": "스레드 20개가 각자 다른 아이템을 200번씩 올렸을 때 사라진 비율. JSON·Smile 은 통째로 덮어써서 남의 갱신까지 지운다. POST /api/v1/layout/concurrency/compare",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 10,
+        "x": 14,
+        "y": 21
+      },
+      "targets": [
+        {
+          "expr": "layout_concurrency_lost_ratio",
+          "legendFormat": "{{layout}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "max": 1
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
